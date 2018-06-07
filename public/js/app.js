@@ -20,14 +20,14 @@ container.appendChild(canvas);
 const ctx = canvas.getContext("2d");
 
 // Draw in the canvas for draw message received
-const socket = new WebSocket(location.origin.replace(/^http/, 'ws'), "protocolOne");
+const socket = new WebSocket("ws://localhost:8080/", "protocolOne");
 
 socket.addEventListener("message", event => {
     const message = JSON.parse(event.data);
 
     if (message.channel != CURRENT_CHANNEL) {
         throw new Error(
-            "On ne devrait pas recevoir de message depuis cette channel"
+            "On ne devrait pas recevoir de message depuis ce channel"
         );
         return;
     }
@@ -96,31 +96,30 @@ const onMouseMove = event => {
     });
 };
 
-const onMouseDown = () => {
+const onMouseDown = event => {
     isPressingCanvas = true;
+    onMouseMove(event);
 };
 
 const onMouseUp = () => {
     isPressingCanvas = false;
 };
 
-var newDrawer = function() {
-    socket.emit('new drawer', user);
-    clearScreen();
-    $('#guesses').empty();
-};
-
-var correctAnswer = function(data) {
-    $('#guesses').html('<p>' + data.username + ' guessed correctly!' + '</p>');
-};
-
-var reset = function(name) {
-    clearScreen();
-    $('#guesses').empty();
-    console.log('New drawer: ' + name);
-    $('#guesses').html('<p>' + name + ' is the new drawer' + '</p>');
-};
-
 canvas.addEventListener("mousemove", onMouseMove, false);
 canvas.addEventListener("mousedown", onMouseDown, false);
 canvas.addEventListener("mouseup", onMouseUp, false);
+
+
+
+function clearScreen()
+{
+    var context = canvas.context;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+
+
+
+
+	
+	
