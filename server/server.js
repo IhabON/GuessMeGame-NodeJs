@@ -26,9 +26,7 @@ const server = http.createServer(app);
 // Initialize the WebSocket server instance
 const wss = new WebSocket.Server({ server });
 wss.room=[];
-redisSubscriber.on("message", function(channel, data) {
-    broadcastToSockets(channel, data);
-  });
+
   /*
    * Subscribe a socket to a specific channel.
    */
@@ -137,106 +135,12 @@ redisSubscriber.on("message", function(channel, data) {
             });
 
             // When client sends data
-            socket.on('data', function(data) {
-                var message = clientName + '> ' + data.toString();
-                broadcast(clientName, message);
-                // Log it to the server output
-                process.stdout.write(message + "\n");
-        });
-        
-        socket.on('new drawer', function(name) {
-        
-            // remove user from 'guesser' room
-            socket.leave('guesser');
+            redisSubscriber.on("message", function(channel, data) {
+                broadcastToSockets(channel, data);
+              });
+        }
     
-            // place user into 'drawer' room
-            socket.join('drawer');
-            console.log('new drawer emit: ' + name);
-    
-            // submit 'drawer' event to the same user
-            socket.emit('drawer', name);
-            
-            // send a random word to the user connected to 'drawer' room
-            server.in('drawer').emit('draw word', newWord());
-        
-        });
-    
-        // initiated from drawer's 'dblclick' event in Player list
-        socket.on('swap rooms', function(data) {
-    
-            // drawer leaves 'drawer' room and joins 'guesser' room
-            socket.leave('drawer');
-            socket.join('guesser');
-    
-            // submit 'guesser' event to this user
-            socket.emit('guesser', socket.username);
-    
-            // submit 'drawer' event to the name of user that was doubleclicked
-            server.in(data.to).emit('drawer', data.to);
-    
-            // submit random word to new user drawer
-            server.in(data.to).emit('draw word', newWord());
-        
-            server.emit('reset', data.to);
-    
-        });
-    
-        socket.on('correct answer', function(data) {
-            server.emit('correct answer', data);
-            console.log(data.username + ' guessed correctly with ' + data.guessword);
-        });
-    
-        socket.on('clear screen', function(name) {
-            server.emit('clear screen', name);
-        });
-    
-        // When client leaves
-        socket.on('end', function() {
-            var message = clientName + ' left this chat\n';
-            // Log it to the server output
-            process.stdout.write(message);
-            // Remove client from socket array
-            removeSocket(socket);
-            // Notify all clients
-            broadcast(clientName, message);
-            
-            for (var i = 0; i < users.length; i++) {
-    
-                // remove user from users list
-                if (users[i] == socket.username) {
-                    users.splice(i, 1);
-                };
-            };
-            console.log(socket.username + ' has disconnected.');
-    
-            // submit updated users list to all clients
-            server.emit('userlist', users);
-    
-            // if 'drawer' room has no connections..
-            if ( typeof io.sockets.adapter.rooms['drawer'] === "undefined") {
-                
-                // generate random number based on length of users list
-                var x = Math.floor(Math.random() * (users.length));
-                console.log(users[x]);
-    
-                // submit new drawer event to the random user in userslist
-                server.in(users[x]).emit('new drawer', users[x]);
-            };
-        });
-    
-        // When socket gets errors
-        socket.on('error', function(error) {
-            console.log('Socket got problems: ', error.message);
-        });
-
-        // Remove disconnected client from sockets array
-        function removeSocket(socket) {
-	        sockets.splice(sockets.indexOf(socket), 1);
-        };
-           
     }
-        
-}
 
 function unsubscribe(socket, channel) {
     let socketSubscribed = socketsPerChannels.get(channel) || new Set();
