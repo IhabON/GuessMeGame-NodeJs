@@ -9,14 +9,7 @@
 </head>
 <body>
     <div id="application">
-			<div id="status">status: offline</div>
-			<div id="firstpanel">			
-		<div id="canvas-container">
-				
-			<input type="text" id="chatnick" value="guest" maxlength="32" />
-			<input type="button" id="readytodraw" value="Ready to draw!" onclick="LancerPartie()" />
-			
-		</div>
+		<div id="canvas-container"></div>
 		<div id="color-picker">
 				<div class="color" style="background: #F2450C;"></div>
 				<div class="color" style="background: #008CFF;"></div>
@@ -43,7 +36,7 @@
 
 			
 			<div class="draw hidden" >
-				<p>The secret word is: <span class="word"></span></p>
+				<p>The secret word is: <span class="wordToGuess"></span></p>
 			</div>
 			<form id="guess" class="hidden" >
 				Guess the word! <input name="guess" class="guess-input" type="text">

@@ -18,9 +18,10 @@ canvas.height = canvas.width / CANVAS_RATIO;
 container.appendChild(canvas);
 
 const ctx = canvas.getContext("2d");
+const wordToDiscover = document.getElementById("wordToGuess");
 
 // Draw in the canvas for draw message received
-const socket = new WebSocket("ws://localhost:8080/", "protocolOne");
+const socket = new WebSocket(location.origin.replace(/^http/, 'ws'), "protocolOne");
 
 socket.addEventListener("message", event => {
     const message = JSON.parse(event.data);
@@ -41,6 +42,7 @@ socket.addEventListener("message", event => {
             message.payload.size
         );
     }
+    if (message.type == "wordToGuess"){}
 });
 
 socket.addEventListener("open", () => {

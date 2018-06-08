@@ -1,12 +1,52 @@
-const net = require('net');
 const express = require('express');
+const Redis = require("redis");
+const path = require("path");
 var users = []
+let guestId = 0;
+let drawer = "";
 const app = express();
+const http = require("http");
+const uuidv4 = require("uuid/v4");
+const WebSocket = require("ws");
 
-function createServerPartie()
-{
-    let server = net.createServer(function(socket) {
-        // Increment user id of incoming connections
+let sockets = [];
+const client = Redis.createClient();
+const redisPublisher = Redis.createClient();
+const redisSubscriber = Redis.createClient();
+
+const PUBLIC_FOLDER = path.join(__dirname, "../public");
+const PORT = process.env.PORT || 5000;
+
+const socketsPerChannels /* Map<string, Set<WebSocket>> */ = new Map();
+const channelsPerSocket /* WeakMap<WebSocket, Set<string> */ = new WeakMap();
+
+// Initialize a simple http server
+const server = http.createServer(app);
+
+// Initialize the WebSocket server instance
+const wss = new WebSocket.Server({ server });
+wss.room=[];
+redisSubscriber.on("message", function(channel, data) {
+    broadcastToSockets(channel, data);
+  });
+  /*
+   * Subscribe a socket to a specific channel.
+   */
+  function subscribe(socket, channel) {
+      let socketSubscribed = socketsPerChannels.get(channel) || new Set();
+      let channelSubscribed = channelsPerSocket.get(socket) || new Set();
+  
+      if (socketSubscribed.size == 0) {
+          redisSubscriber.subscribe(channel);
+      }
+  
+      socketSubscribed = socketSubscribed.add(socket);
+      channelSubscribed = channelSubscribed.add(channel);
+  
+      socketsPerChannels.set(channel, socketSubscribed);
+      channelsPerSocket.set(socket, channelSubscribed);
+
+      // Increment user id of incoming connections
         guestId++;
     
         socket.nickname = "Guest_" + guestId;
@@ -25,15 +65,16 @@ function createServerPartie()
             
         });     
         // Log it to the server output
-        console.log(clientName + ' joined this chat.\n');
-        broadcast(clientName, clientName + ' joined this chat.');
+        console.log(clientName + ' joined this game.\n');
         
         if(users.length < 2)
         {               
             PartieComplete = false;
             console.log("il manque des joueur");
+            console.log("La partie va commencer, en attente d'autre joueur");
         }
         else{
+            
             PartieComplete = true;
             server.emit('userlist', users);
             var	words = [
@@ -53,33 +94,34 @@ function createServerPartie()
                 return words[wordcount];
             };
     
-             // if the user is first to join OR 'drawer' room has no connections
-             if (users.length == 1 || typeof io.sockets.adapter.rooms['drawer'] === 'undefined') {
-        
-                // place user into 'drawer' room
-                socket.join('drawer');
-    
-                // server submits the 'drawer' event to this user
-                server.in(socket.username).emit('drawer', socket.username);
-                console.log(socket.username + ' is a drawer');
-    
-                // send the random word to the user inside the 'drawer' room
-                server.in(socket.username).emit('draw word', newWord());
-            //	console.log(socket.username + "'s draw word (join event): " + newWord());
-            } 
-    
-            // if there are more than one names in users 
-            // or there is a person in drawer room..
-            else {
-    
-                // additional users will join the 'guesser' room
-                socket.join('guesser');
-    
-                // server submits the 'guesser' event to this user
-                server.in(socket.username).emit('guesser', socket.username);
-                console.log(socket.username + ' is a guesser');
+            if(users.length == 4){
+                let randomUser = Math.floor(Math.random()*users.length);
+                console.log(randomUser);
+                let listeguesser = users.splice(0,randomUser); 
+                console.log("La Partie va commencer");
+                console.log(users[randomUser] + ' is a drawer');
+                drawer = users[randomUser];
+                if(drawer != null){
+                    wss.room.push('drawer');
+                    // place user into 'drawer' room
+                    wss.room.join('drawer');
+                    // server submits the 'drawer' event to this user
+                    //server.in(socket.username).emit('drawer', socket.username);
+                    // send the random word to the user inside the 'drawer' room
+                    //server.in(socket.username).emit('draw word', newWord());
+                    console.log(users[randomUser] + "'s draw word : " + newWord());
+                    if(listeguesser != null){
+                        // server submits the 'guesser' event to this user
+                        //server.in(socket.username).emit('guesser', socket.username);
+                        console.log(listeguesser + ' are a guesser');
+                        listeguesser.forEach(function(){
+                            wss.room.push('guesser');
+                            // additional users will join the 'guesser' room
+                            wss.room.join('guesser');
+                        });
+                    } 
+                }
             }
-        
             // update all clients with the list of users
             server.emit('userlist', users);
     
@@ -93,16 +135,13 @@ function createServerPartie()
                 server.emit('guessword', { username: data.username, guessword: data.guessword})
                 console.log('guessword event triggered on server from: ' + data.username + ' with word: ' + data.guessword);
             });
-           
-        }
-     
 
-        // When client sends data
-        socket.on('data', function(data) {
-            var message = clientName + '> ' + data.toString();
-            broadcast(clientName, message);
-            // Log it to the server output
-            process.stdout.write(message + "\n");
+            // When client sends data
+            socket.on('data', function(data) {
+                var message = clientName + '> ' + data.toString();
+                broadcast(clientName, message);
+                // Log it to the server output
+                process.stdout.write(message + "\n");
         });
         
         socket.on('new drawer', function(name) {
@@ -189,42 +228,100 @@ function createServerPartie()
         socket.on('error', function(error) {
             console.log('Socket got problems: ', error.message);
         });
+
+        // Remove disconnected client from sockets array
+        function removeSocket(socket) {
+	        sockets.splice(sockets.indexOf(socket), 1);
+        };
+           
+    }
+        
+}
+
+function unsubscribe(socket, channel) {
+    let socketSubscribed = socketsPerChannels.get(channel) || new Set();
+    let channelSubscribed = channelsPerSocket.get(socket) || new Set();
+
+    socketSubscribed.delete(socket);
+    channelSubscribed.delete(channel);
+
+    if (socketSubscribed.size == 0) {
+        redisSubscriber.unsubscribe(channel);
+    }
+
+    socketsPerChannels.set(channel, socketSubscribed);
+    channelsPerSocket.set(socket, channelSubscribed);
+}
+
+/*
+ * Subscribe a socket from all channels.
+ */
+function unsubscribeAll(socket) {
+    const channelSubscribed = channelsPerSocket.get(socket) || new Set();
+
+    channelSubscribed.forEach(channel => {
+        unsubscribe(socket, channel);
     });
 }
 
-// Broadcast to others, excluding the sender
-function broadcast(from, message) {
-	// If there are no sockets, then don't broadcast any messages
-	if (sockets.length === 0) {
-		process.stdout.write('Everyone left the chat\n');
-		return;
-	}
+function broadcastToSockets(channel, data) {
+    const socketSubscribed = socketsPerChannels.get(channel) || new Set();
 
-	// If there are clients remaining then broadcast message
-	sockets.forEach(function(socket, index, array){
-		// Dont send any messages to the sender
-		if(socket.nickname === from) return;
-		socket.write(message);
-	});
+    // redisPublisher.publish(channel, data);
 
-};
+    socketSubscribed.forEach(client => {
+        client.send(data);
+    });
+}
 
-// Remove disconnected client from sockets array
-function removeSocket(socket) {
-	sockets.splice(sockets.indexOf(socket), 1);
-};
+// Broadcast message from client
+wss.on("connection", ws => {
+    ws.on('close', () => {
+        unsubscribeAll(ws);
+    });
+
+    ws.on("message", data => {
+        const message = JSON.parse(data.toString());
+        switch (message.type) {
+            case 'subscribe':
+                client.lrange(message.channel, 0, 100, (err, result) => {
+                    result.map(data => ws.send(data));
+                });
+                subscribe(ws, message.channel);
+                break;
+            default:
+                client.lpush(message.channel, data);
+                redisPublisher.publish(message.channel, data);
+                broadcastToSockets(message.channel, data);
+                break;
+        }
+    });
+});
+
+// Assign a random channel to people opening the application
+app.get("/", (req, res) => {
+    res.redirect(`/${uuidv4()}`);
+});
+
+app.get("/:channel", (req, res, next) => {
+    res.sendFile(path.join(PUBLIC_FOLDER, "index.html"), {}, err => {
+        if (err) {
+            next(err);
+        }
+    });
+});
+
+app.use(express.static(PUBLIC_FOLDER));
 
 // Listening for any problems with the server
 server.on('error', function(error) {
 	console.log("So we got problems!", error.message);
 });
 
-app.get("/", (req, res, next) => createServerPartie());
-
 // Listen for a port to telnet to
 // then in the terminal just run 'telnet localhost [port]'
-server.listen(port, function() {
-	console.log("Server listening at http://localhost:" + port);
+server.listen(PORT, function() {
+	console.log("Server listening at http://localhost:" + PORT);
 });
 
 
