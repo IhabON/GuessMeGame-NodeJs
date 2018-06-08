@@ -22,6 +22,7 @@ var	words = [
             ];
 
             function newWord() {
+                
                 wordcount = Math.floor(Math.random() * (words.length));
                 return words[wordcount];
             };
