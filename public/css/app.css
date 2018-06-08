@@ -33,13 +33,32 @@ body, html {
     box-shadow: 0px 4px 10px rgba(0,0,0,0.08);
 }
 
+.userList {
+    font-size: 16px;
+    padding-left: 15px;
+    padding-bottom: 15px;
+    background-color: #f7f7f8;
+    border-bottom: 2px solid #f9f9fa;
+}
 
+
+
+.inputArea {
+    text-align: center;
+    width: 100px;
+    height: 30px;
+    padding: 5px 5px;
+    background-color: #e8ebee;
+    border: 2px solid #002966;
+    font-size: 22px;
+    position: fixed;
+}
 
 .users {
     display: inline-block;
     background-color: white;
     width: 25%;
-    height: 505px;
+    height: 500px;
     margin: 10px 10px;
     padding: 10px;
     vertical-align: top;

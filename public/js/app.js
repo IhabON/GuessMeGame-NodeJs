@@ -1,3 +1,4 @@
+var socket = io();
 let isPressingCanvas = false;
 let color;
 let size = 6;
@@ -11,6 +12,9 @@ const CURRENT_CHANNEL = location.pathname.slice(1);
 // Prepare the canvas
 const canvas = document.createElement("canvas");
 const container = document.getElementById("canvas-container");
+
+//Info Form
+var nickname = document.getElementById("nickname");
 
 canvas.id = "CursorLayer";
 canvas.width = container.clientWidth;
@@ -42,7 +46,12 @@ socket.addEventListener("message", event => {
             message.payload.size
         );
     }
-    if (message.type == "wordToGuess"){}
+
+    if(message.type == "message")
+    {
+       sendName();
+    }
+
 });
 
 socket.addEventListener("open", () => {
@@ -52,6 +61,17 @@ socket.addEventListener("open", () => {
 function sendMessage(type, payload) {
     const message = { type, payload, channel: CURRENT_CHANNEL };
     socket.send(JSON.stringify(message));
+    
+}
+
+function sendName()
+{
+    
+    Namevalue = nickname.value;
+    
+    
+    socket.send(JSON.stringify(Namevalue));
+     
 }
 
 function drawInCanvas(ctx, x, y, color, size) {
@@ -111,17 +131,33 @@ canvas.addEventListener("mousemove", onMouseMove, false);
 canvas.addEventListener("mousedown", onMouseDown, false);
 canvas.addEventListener("mouseup", onMouseUp, false);
 
-
+  
 
 function clearScreen()
 {
     var context = canvas.context;
     context.clearRect(0, 0, canvas.width, canvas.height);
 }
+    
 
+$(document).ready(function() {
 
+    canvas = $('#canvas');
+    context = canvas[0].getContext('2d');
+    canvas[0].width = canvas[0].offsetWidth;
+    canvas[0].height = canvas[0].offsetHeight;
 
+    usernameAsk();
 
+    socket.on('userlist', userlist);
+    socket.on('guesser', guesser);
+    socket.on('guessword', guessword);
+    socket.on('draw', draw);
+    socket.on('draw word', drawWord);
+    socket.on('drawer', pictionary);
+    socket.on('new drawer', newDrawer);
+    socket.on('correct answer', correctAnswer);
+    socket.on('reset', reset);
+    socket.on('clear screen', clearScreen);
 
-	
-	
+});
